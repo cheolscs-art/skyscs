@@ -1,7 +1,0 @@
-{
-  "name": "SCS MP3 Player",
-  "description": "A sophisticated, Android-inspired MP3 player with high-fidelity audio visualization, smart playlist management, and AI-powered track insights using Gemini 3 Flash.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
