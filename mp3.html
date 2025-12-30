@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vintage Real EQ Amp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- 기존 레트로 앰프 디자인 CSS --- */
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: #222;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .amp-player {
+            background: #1a1a1a;
+            border: 4px solid #000;
+            border-radius: 10px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9), inset 0 0 20px rgba(255,255,255,0.05);
+            padding: 30px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            position: relative;
+            outline: none; /* 포커스 아웃라인 제거 */
+        }
+
+        .amp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+        }
+        .amp-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #d4af37;
+            letter-spacing: 3px;
+            text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+        }
+        .power-light {
+            width: 12px; height: 12px;
+            background: #e74c3c;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #e74c3c;
+            transition: 0.3s;
+        }
+        .power-light.on {
+            background: #2ecc71;
+            box-shadow: 0 0 10px #2ecc71, inset 0 0 2px #fff;
+        }
+
+        /* 디스플레이 영역 (캔버스 포함) */
+        .display-screen-container {
+            position: relative;
+            width: 100%;
+            height: 100px;
+            background: #000;
+            border: 2px solid #444;
+            border-radius: 4px;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+        /* 비주얼라이저 캔버스 */
+        #visualizerCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        /* 스캔라인 및 텍스트 오버레이 */
+        .screen-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: monospace;
+            color: #33ff33;
+            text-shadow: 0 0 5px #33ff33;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            pointer-events: none; /* 클릭 통과 */
+        }
+
+        #title {
+            font-size: 1.1rem;
+            margin: 0 0 5px 0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 90%;
+        }
+        .time-display { font-size: 0.9rem; }
+
+        /* 컨트롤 패널 (6개 노브 레이아웃) */
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px 15px; /* 상하 20px, 좌우 15px */
+            margin-bottom: 25px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .control-group label {
+            font-size: 0.7rem; color: #888; margin-bottom: 8px; text-transform: uppercase;
+        }
+        
+        .knob-container {
+            width: 55px; height: 55px;
+            background: #2b2b2b;
+            border-radius: 50%;
+            border: 2px solid #111;
+            position: relative;
+            cursor: grab;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1);
+            /* 초기 각도 설정 (볼륨은 -135도, EQ는 0도 중앙) */
+            transform: rotate(var(--angle, 0deg));
+        }
+        .knob-container:active { cursor: grabbing; }
+        .knob-marker {
+            position: absolute; top: 5px; left: 50%;
+            transform: translateX(-50%);
+            width: 4px; height: 15px;
+            background: #d4af37; border-radius: 2px;
+        }
+
+        /* 버튼 그룹 */
+        .btn-group {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .amp-btn {
+            background: linear-gradient(to bottom, #444, #222);
+            color: #ccc; border: 1px solid #111;
+            padding: 10px 20px; border-radius: 4px;
+            cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 0.8rem;
+            box-shadow: 0 3px 0 #000; transition: transform 0.1s;
+        }
+        .amp-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #000; }
+        .amp-btn.play-btn { color: #2ecc71; border-color: #2ecc71; }
+        
+        .file-label {
+            display: inline-block; background: #d4af37; color: #111;
+            padding: 10px 15px; border-radius: 4px; cursor: pointer;
+            font-size: 0.8rem; font-weight: bold; box-shadow: 0 3px 0 #8f7524;
+        }
+        .file-label:active { transform: translateY(3px); box-shadow: none; }
+
+        /* 진행바 및 플레이리스트 */
+        input[type="range"]#progressBar {
+            -webkit-appearance: none; width: 100%; height: 6px; background: #333;
+            border-radius: 3px; outline: none; margin-bottom: 15px;
+        }
+        input[type="range"]#progressBar::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 15px; height: 15px; background: #d4af37; border-radius: 50%; cursor: pointer;
+        }
+        
+        /* 플레이리스트 스타일 수정 */
+        .playlist-header {
+            text-align: left; font-size: 0.7rem; color: #666; margin-bottom: 5px;
+            padding-left: 5px;
+        }
+        .playlist {
+            background: #111; border: 1px solid #333; height: 120px; overflow-y: auto;
+            border-radius: 4px; text-align: left; padding: 5px;
+        }
+        .playlist-item {
+            padding: 8px; font-size: 0.8rem; border-bottom: 1px solid #222;
+            cursor: pointer; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            transition: all 0.2s;
+        }
+        .playlist-item:hover { background: #222; color: #fff; }
+        .playlist-item.active { 
+            background: #2ecc71; color: #000; font-weight: bold; 
+            border-left: 5px solid #fff; /* 현재 재생 중 표시 강화 */
+        }
+        /* 삭제 안내용 툴팁 효과 */
+        .playlist-item.active::after {
+            content: ' [DEL]'; font-size: 0.7rem; opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+<div class="amp-player" tabindex="0" id="playerBody">
+    <div class="amp-header">
+        <div class="amp-logo">SCS-EQ AMP</div>
+        <div class="power-light" id="powerLight"></div>
+    </div>
+
+    <div class="display-screen-container">
+        <canvas id="visualizerCanvas"></canvas>
+        <div class="screen-overlay">
+            <h2 id="title">NO AUDIO</h2>
+            <div class="time-display">
+                <span id="currTime">0:00</span> / <span id="totalTime">0:00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="control-group">
+            <label>Master Vol</label>
+            <div class="knob-container knob-control" id="knob-vol" data-type="volume" style="--angle: -135deg;">
+                <div class="knob-marker"></div>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>60Hz (Bass)</label>
+            <div class="knob-container knob-control" id="knob-60" data-type="eq" data-index="0" style="--angle: 0deg;">
+                <div class="knob-marker"></div>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>250Hz</label>
+            <div class="knob-container knob-control" id="knob-250" data-type="eq" data-index="1" style="--angle: 0deg;">
+                <div class="knob-marker"></div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label>1kHz (Mid)</label>
+            <div class="knob-container knob-control" id="knob-1k" data-type="eq" data-index="2" style="--angle: 0deg;">
+                <div class="knob-marker"></div>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>4kHz</label>
+            <div class="knob-container knob-control" id="knob-4k" data-type="eq" data-index="3" style="--angle: 0deg;">
+                <div class="knob-marker"></div>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>16kHz (Treble)</label>
+            <div class="knob-container knob-control" id="knob-16k" data-type="eq" data-index="4" style="--angle: 0deg;">
+                <div class="knob-marker"></div>
+            </div>
+        </div>
+    </div>
+
+    <input type="range" id="progressBar" value="0" max="100">
+
+    <div class="btn-group">
+        <button class="amp-btn" id="prevBtn">PREV</button>
+        <button class="amp-btn play-btn" id="playBtn">PLAY</button>
+        <button class="amp-btn" id="nextBtn">NEXT</button>
+    </div>
+
+    <label for="fileInput" class="file-label">💿 INSERT TAPE (Load Files)</label>
+    <input type="file" id="fileInput" accept="audio/*" multiple style="display: none;">
+
+    <div class="playlist-header">Playlist (Press 'DEL' to remove selected)</div>
+    <div class="playlist" id="playlist"></div>
+</div>
+
+<audio id="audio" crossorigin="anonymous"></audio>
+
+<script>
+    // ===========================
+    // 1. 전역 변수 및 요소 참조
+    // ===========================
+    const audio = document.getElementById('audio');
+    const playBtn = document.getElementById('playBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const titleEl = document.getElementById('title');
+    const currTimeEl = document.getElementById('currTime');
+    const totalTimeEl = document.getElementById('totalTime');
+    const progressBar = document.getElementById('progressBar');
+    const playlistEl = document.getElementById('playlist');
+    const powerLight = document.getElementById('powerLight');
+    const canvas = document.getElementById('visualizerCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let songList = [];
+    let currentIndex = 0;
+    let isPlaying = false;
+
+    // Web Audio API 관련 변수
+    let audioContext;
+    let sourceNode;
+    let analyser;
+    let eqFilters = [];
+    const eqFrequencies = [60, 250, 1000, 4000, 16000]; // 5밴드 주파수
+    let isAudioContextInitialized = false;
+
+    // 캔버스 크기 설정
+    function resizeCanvas() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas(); // 초기 실행
+
+    // ===========================
+    // 2. Web Audio API 초기화
+    // ===========================
+    function initAudioContext() {
+        if (isAudioContextInitialized) return;
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContext();
+
+        sourceNode = audioContext.createMediaElementSource(audio);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+
+        eqFilters = eqFrequencies.map(freq => {
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'peaking';
+            filter.frequency.value = freq;
+            filter.Q.value = 1.0;
+            filter.gain.value = 0;
+            return filter;
+        });
+
+        sourceNode.connect(eqFilters[0]);
+        for (let i = 0; i < eqFilters.length - 1; i++) {
+            eqFilters[i].connect(eqFilters[i + 1]);
+        }
+        eqFilters[eqFilters.length - 1].connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        isAudioContextInitialized = true;
+        drawVisualizer();
+    }
+
+    // ===========================
+    // 3. 비주얼라이저
+    // ===========================
+    function drawVisualizer() {
+        requestAnimationFrame(drawVisualizer);
+
+        if (!isAudioContextInitialized) return;
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+            const barHeight = (dataArray[i] / 255) * canvas.height;
+
+            const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+            gradient.addColorStop(0, 'rgba(0, 255, 0, 0.8)');
+            gradient.addColorStop(1, 'rgba(150, 255, 150, 0.5)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+
+            x += barWidth;
+        }
+    }
+
+    // ===========================
+    // 4. 노브 컨트롤
+    // ===========================
+    let activeKnob = null;
+    const knobElements = document.querySelectorAll('.knob-control');
+
+    knobElements.forEach(knob => {
+        knob.addEventListener('mousedown', (e) => {
+            activeKnob = knob;
+            updateKnobValue(e);
+        });
+        if(knob.dataset.type === 'eq') {
+            knob.addEventListener('dblclick', () => {
+                resetEqKnob(knob);
+            });
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (activeKnob) updateKnobValue(e);
+    });
+
+    document.addEventListener('mouseup', () => {
+        activeKnob = null;
+    });
+
+    function updateKnobValue(e) {
+        if (!activeKnob) return;
+
+        const rect = activeKnob.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let deg = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+        if (deg < 90) deg += 360;
+        let normalizedAngle = deg - 90;
+        
+        const startAngle = 45; 
+        const endAngle = 315; 
+        
+        if (normalizedAngle < startAngle) normalizedAngle = startAngle;
+        if (normalizedAngle > endAngle) normalizedAngle = endAngle;
+
+        const ratio = (normalizedAngle - startAngle) / (endAngle - startAngle);
+        const knobType = activeKnob.dataset.type;
+
+        if (knobType === 'volume') {
+            audio.volume = ratio;
+            activeKnob.style.setProperty('--angle', `${ratio * 270 - 135}deg`);
+
+        } else if (knobType === 'eq') {
+            if (!isAudioContextInitialized) initAudioContext();
+            const index = parseInt(activeKnob.dataset.index);
+            const gainValue = (ratio * 24) - 12;
+            eqFilters[index].gain.value = gainValue;
+            activeKnob.style.setProperty('--angle', `${ratio * 270 - 135}deg`);
+        }
+    }
+
+    function resetEqKnob(knob) {
+        if (!isAudioContextInitialized) initAudioContext();
+        const index = parseInt(knob.dataset.index);
+        eqFilters[index].gain.value = 0; 
+        knob.style.setProperty('--angle', `0deg`);
+    }
+
+    // ===========================
+    // 5. 플레이어 기능 및 삭제 로직
+    // ===========================
+    
+    // 키보드 이벤트 리스너 (Delete 키)
+    document.addEventListener('keydown', (e) => {
+        // Delete 키가 눌렸고 리스트가 비어있지 않을 때
+        if (e.key === 'Delete' && songList.length > 0) {
+            deleteCurrentSong();
+        }
+    });
+
+    function deleteCurrentSong() {
+        if (confirm(`'${songList[currentIndex].name}' 파일을 목록에서 삭제하시겠습니까?`)) {
+            // 1. 배열에서 삭제
+            songList.splice(currentIndex, 1);
+
+            // 2. 목록이 비었을 경우 처리
+            if (songList.length === 0) {
+                audio.pause();
+                audio.src = ""; // 소스 초기화
+                titleEl.innerText = "NO AUDIO";
+                currTimeEl.innerText = "0:00";
+                totalTimeEl.innerText = "0:00";
+                progressBar.value = 0;
+                powerLight.classList.remove('on');
+                isPlaying = false;
+                playBtn.innerText = "PLAY";
+                renderPlaylist();
+                return;
+            }
+
+            // 3. 인덱스 조정 (마지막 곡을 지웠을 경우 인덱스 감소)
+            if (currentIndex >= songList.length) {
+                currentIndex = songList.length - 1;
+            }
+
+            // 4. 새로운 현재 곡 로드 및 UI 갱신
+            // 삭제 후 자동으로 다음 곡(또는 현재 인덱스의 곡)을 로드
+            loadSong(currentIndex);
+            
+            // 재생 중이었다면 계속 재생, 아니면 멈춤 상태 유지
+            if (isPlaying) {
+                playAudio();
+            } else {
+                renderPlaylist(); // loadSong에서 호출하지만 명시적으로
+            }
+        }
+    }
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        // 기존 리스트에 추가할지, 덮어쓸지 결정 (여기선 덮어쓰기)
+        songList = files;
+        currentIndex = 0;
+        renderPlaylist();
+        loadSong(currentIndex);
+        powerLight.classList.add('on');
+        // 파일 추가 후 플레이어 본체에 포커스 줌 (키보드 이벤트 활성화)
+        document.getElementById('playerBody').focus();
+    });
+
+    function renderPlaylist() {
+        playlistEl.innerHTML = '';
+        songList.forEach((file, index) => {
+            const item = document.createElement('div');
+            item.className = `playlist-item ${index === currentIndex ? 'active' : ''}`;
+            item.innerText = `${index + 1}. ${file.name}`;
+            item.onclick = () => {
+                currentIndex = index;
+                loadSong(currentIndex);
+                playAudio();
+            };
+            playlistEl.appendChild(item);
+        });
+    }
+
+    function loadSong(index) {
+        if (!songList[index]) return;
+        titleEl.innerText = songList[index].name;
+        audio.src = URL.createObjectURL(songList[index]);
+        progressBar.value = 0;
+        currTimeEl.innerText = "0:00"; totalTimeEl.innerText = "0:00";
+        renderPlaylist();
+    }
+
+    function playAudio() {
+        if (!isAudioContextInitialized) initAudioContext();
+        if (audioContext.state === 'suspended') audioContext.resume();
+
+        audio.play().then(() => {
+            isPlaying = true; playBtn.innerText = "PAUSE";
+            powerLight.classList.add('on');
+        }).catch(console.error);
+    }
+    
+    playBtn.onclick = () => {
+        if (songList.length === 0) return alert("TAPE NOT INSERTED (파일을 추가하세요)");
+        if (isPlaying) { audio.pause(); isPlaying = false; playBtn.innerText = "PLAY"; }
+        else playAudio();
+    };
+
+    prevBtn.onclick = () => {
+        if (songList.length === 0) return;
+        currentIndex = (currentIndex - 1 + songList.length) % songList.length;
+        loadSong(currentIndex); playAudio();
+    };
+    nextBtn.onclick = () => {
+        if (songList.length === 0) return;
+        currentIndex = (currentIndex + 1) % songList.length;
+        loadSong(currentIndex); playAudio();
+    };
+
+    audio.addEventListener('timeupdate', () => {
+        if (!isNaN(audio.duration)) {
+            progressBar.value = (audio.currentTime / audio.duration) * 100;
+            currTimeEl.innerText = formatTime(audio.currentTime);
+            totalTimeEl.innerText = formatTime(audio.duration);
+        }
+    });
+    progressBar.addEventListener('input', () => {
+        audio.currentTime = (progressBar.value / 100) * audio.duration;
+    });
+    audio.addEventListener('ended', () => nextBtn.click());
+
+    function formatTime(s) {
+        if (isNaN(s)) return "0:00";
+        return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`;
+    }
+    
+    // 초기 볼륨 노브 위치 동기화
+    updateKnobValue({ clientY: 0, clientX: 0 });
+    document.getElementById('knob-vol').style.setProperty('--angle', `${audio.volume * 270 - 135}deg`);
+
+</script>
+</body>
+</html>
